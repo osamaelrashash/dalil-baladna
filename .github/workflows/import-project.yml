@@ -1,6 +1,7 @@
 name: Import project ZIP
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -9,7 +10,7 @@ permissions:
 
 jobs:
   import:
-    if: ${{ github.event.head_commit.message != 'Import project from ZIP' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.head_commit.message != 'Import project from ZIP' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -18,7 +19,7 @@ jobs:
       - name: Download ZIP from Google Drive
         run: |
           curl -L --fail --retry 3 "https://drive.usercontent.google.com/download?id=1M2R9dVj8QX4S3Mqy1sUicuV5N9yfppLB&export=download&confirm=t" -o project.zip
-          unzip -l project.zip | head -30
+          unzip -t project.zip >/dev/null
 
       - name: Extract project
         run: |
@@ -26,11 +27,7 @@ jobs:
           mkdir extracted
           unzip -q project.zip -d extracted
           root="extracted/baladna"
-          if [ ! -f "$root/package.json" ]; then
-            echo "package.json not found"
-            find extracted -maxdepth 3 -type f | head -100
-            exit 1
-          fi
+          test -f "$root/package.json"
           rm -rf "$root/.git"
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .github -exec rm -rf {} +
           cp -a "$root"/. .
@@ -39,8 +36,7 @@ jobs:
 
       - name: Remove secrets
         run: |
-          rm -f .env .env.local
-          find . -name ".env" -o -name ".env.local" | xargs -r rm -f
+          find . -type f \( -name ".env" -o -name ".env.local" \) -delete
 
       - name: Commit imported project
         run: |
